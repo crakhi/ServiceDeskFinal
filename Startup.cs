@@ -11,6 +11,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 using Microsoft.BotBuilderSamples.Bots;
 using Microsoft.BotBuilderSamples.Dialogs;
+using CoreBot.Services;
 
 namespace Microsoft.BotBuilderSamples
 {
@@ -41,6 +42,8 @@ namespace Microsoft.BotBuilderSamples
 
             // Create the Conversation state. (Used by the Dialog system itself.)
             services.AddSingleton<ConversationState>();
+
+            services.AddSingleton<BotService>();
 
             // The Dialog that will be run by the bot.
             services.AddSingleton<MainDialog>();

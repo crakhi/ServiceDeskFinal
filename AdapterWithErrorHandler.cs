@@ -19,8 +19,12 @@ namespace Microsoft.BotBuilderSamples
                 // Log any leaked exception from the application.
                 logger.LogError($"Exception caught : {exception.Message}");
 
-                // Send a catch-all apology to the user.
-                await turnContext.SendActivityAsync("Sorry, it looks like something went wrong.");
+                // Send a catch-all apology to the user.\
+                string errorMessage = "Sorry, it looks like something went wrong.";
+#if DEBUG
+                errorMessage = "Exception : " + exception.Message;
+#endif
+                await turnContext.SendActivityAsync(errorMessage);
 
                 if (conversationState != null)
                 {

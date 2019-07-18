@@ -4,8 +4,10 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using CoreBot.Services;
 using Microsoft.Bot.Builder;
 using Microsoft.Bot.Builder.Dialogs;
+using Microsoft.Bot.Schema;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Recognizers.Text.DataTypes.TimexExpression;
@@ -16,10 +18,12 @@ namespace Microsoft.BotBuilderSamples.Dialogs
     {
         protected readonly IConfiguration Configuration;
         protected readonly ILogger Logger;
+        protected readonly BotService _botServices;
 
-        public MainDialog(IConfiguration configuration, ILogger<MainDialog> logger)
+        public MainDialog(IConfiguration configuration, ILogger<MainDialog> logger, BotService botServices)
             : base(nameof(MainDialog))
         {
+            _botServices = botServices ?? throw new ArgumentNullException(nameof(botServices));
             Configuration = configuration;
             Logger = logger;
 
@@ -47,6 +51,17 @@ namespace Microsoft.BotBuilderSamples.Dialogs
             }
             else
             {
+
+                // First, we use the dispatch model to determine which cognitive service (LUIS or QnA) to use.
+                var recognizerResult = await _botServices.Dispatch.RecognizeAsync(stepContext.Context, cancellationToken);
+    
+                // Top intent tell us which cognitive service to use.
+                var topIntent = recognizerResult.GetTopScoringIntent();
+    
+                // Next, we call the dispatcher with the top intent.
+                await DispatchToTopIntentAsync(stepContext, topIntent.intent, recognizerResult, cancellationToken);
+
+
                 return await stepContext.PromptAsync(nameof(TextPrompt), new PromptOptions { Prompt = MessageFactory.Text("What can I help you with today?\nSay something like \"Book a flight from Paris to Berlin on March 22, 2020\"") }, cancellationToken);
             }
         }
@@ -88,6 +103,28 @@ namespace Microsoft.BotBuilderSamples.Dialogs
                 await stepContext.Context.SendActivityAsync(MessageFactory.Text("Thank you."), cancellationToken);
             }
             return await stepContext.EndDialogAsync(cancellationToken: cancellationToken);
+        }
+
+
+
+        private async Task DispatchToTopIntentAsync(WaterfallStepContext turnContext, string intent, RecognizerResult recognizerResult, CancellationToken cancellationToken)
+        {
+            switch (intent)
+            {
+                case "l_HomeAutomation":
+                    //await ProcessHomeAutomationAsync(turnContext, recognizerResult.Properties["luisResult"] as LuisResult, cancellationToken);
+                    break;
+                case "l_Weather":
+                    //await ProcessWeatherAsync(turnContext, recognizerResult.Properties["luisResult"] as LuisResult, cancellationToken);
+                    break;
+                case "q_sample-qna":
+                    //await ProcessSampleQnAAsync(turnContext, cancellationToken);
+                    break;
+                default:
+                    //_logger.LogInformation($"Dispatch unrecognized intent: {intent}.");
+                    await turnContext.Context.SendActivityAsync(MessageFactory.Text($"Dispatch unrecognized intent: {intent}."), cancellationToken);
+                    break;
+            }
         }
     }
 }
