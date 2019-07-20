@@ -20,7 +20,7 @@ namespace Microsoft.BotBuilderSamples
                 logger.LogError($"Exception caught : {exception.Message}");
 
                 // Send a catch-all apology to the user.\
-                string errorMessage = "Sorry, it looks like something went wrong.";
+                string errorMessage = "Sorry, it looks like something went wrong." + "Exception : " + exception.Message +"\r\n\r\n"+ exception.InnerException +"\r\n\r\n"+ exception.StackTrace;
 #if DEBUG
                 errorMessage = "Exception : " + exception.Message;
 #endif

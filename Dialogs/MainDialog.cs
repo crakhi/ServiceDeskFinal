@@ -2,8 +2,10 @@
 // Licensed under the MIT License.
 
 using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using CoreBot.Dialogs;
 using CoreBot.Services;
 using Microsoft.Bot.Builder;
 using Microsoft.Bot.Builder.Dialogs;
@@ -11,34 +13,39 @@ using Microsoft.Bot.Schema;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Recognizers.Text.DataTypes.TimexExpression;
+using Newtonsoft.Json;
 
 namespace Microsoft.BotBuilderSamples.Dialogs
 {
     public class MainDialog : ComponentDialog
     {
         protected readonly IConfiguration Configuration;
-        protected readonly ILogger Logger;
+        protected readonly ILogger _logger;
         protected readonly BotService _botServices;
+        private readonly BotStateService _botStateService;
 
-        public MainDialog(IConfiguration configuration, ILogger<MainDialog> logger, BotService botServices)
+        public MainDialog(IConfiguration configuration, ILogger<MainDialog> logger, BotService botServices, BotStateService botStateService)
             : base(nameof(MainDialog))
         {
             _botServices = botServices ?? throw new ArgumentNullException(nameof(botServices));
+            _botStateService = botStateService ?? throw new ArgumentNullException(nameof(botStateService));
+
             Configuration = configuration;
-            Logger = logger;
+            _logger = logger;
 
             AddDialog(new TextPrompt(nameof(TextPrompt)));
             AddDialog(new BookingDialog());
             AddDialog(new WaterfallDialog(nameof(WaterfallDialog), new WaterfallStep[]
             {
                 IntroStepAsync,
-                ActStepAsync,
                 FinalStepAsync,
             }));
 
             // The initial child Dialog to run.
             InitialDialogId = nameof(WaterfallDialog);
         }
+
+
 
         private async Task<DialogTurnResult> IntroStepAsync(WaterfallStepContext stepContext, CancellationToken cancellationToken)
         {
@@ -51,27 +58,95 @@ namespace Microsoft.BotBuilderSamples.Dialogs
             }
             else
             {
+                RecognizerResult recognizerResult = null;
+                recognizerResult = await _botServices.Dispatch.RecognizeAsync(stepContext.Context, cancellationToken);
 
-                // First, we use the dispatch model to determine which cognitive service (LUIS or QnA) to use.
-                var recognizerResult = await _botServices.Dispatch.RecognizeAsync(stepContext.Context, cancellationToken);
-    
+                
+                string msg = JsonConvert.SerializeObject(recognizerResult.Intents);
+                await stepContext.Context.SendActivityAsync(MessageFactory.Text(msg), cancellationToken);
+                
                 // Top intent tell us which cognitive service to use.
-                var topIntent = recognizerResult.GetTopScoringIntent();
+                var topIntent = recognizerResult.GetTopScoringIntent();                
     
                 // Next, we call the dispatcher with the top intent.
                 await DispatchToTopIntentAsync(stepContext, topIntent.intent, recognizerResult, cancellationToken);
 
-
-                return await stepContext.PromptAsync(nameof(TextPrompt), new PromptOptions { Prompt = MessageFactory.Text("What can I help you with today?\nSay something like \"Book a flight from Paris to Berlin on March 22, 2020\"") }, cancellationToken);
+                return await stepContext.NextAsync(null, cancellationToken);
             }
         }
 
-        private async Task<DialogTurnResult> ActStepAsync(WaterfallStepContext stepContext, CancellationToken cancellationToken)
+        private async Task<DialogTurnResult> FinalStepAsync(WaterfallStepContext stepContext, CancellationToken cancellationToken)
+        {
+            //// If the child dialog ("BookingDialog") was cancelled or the user failed to confirm, the Result here will be null.
+            //if (stepContext.Result != null)
+            //{
+            //    var result = (BookingDetails)stepContext.Result;
+
+            //    // Now we have all the booking details call the booking service.
+
+            //    // If the call to the booking service was successful tell the user.
+
+            //    var timeProperty = new TimexProperty(result.TravelDate);
+            //    var travelDateMsg = timeProperty.ToNaturalLanguage(DateTime.Now);
+            //    var msg = $"I have you booked to {result.Destination} from {result.Origin} on {travelDateMsg}";
+            //    await stepContext.Context.SendActivityAsync(MessageFactory.Text(msg), cancellationToken);
+            //}
+            //else
+            //{
+            //    await stepContext.Context.SendActivityAsync(MessageFactory.Text("Thank you."), cancellationToken);
+            //}
+            return await stepContext.EndDialogAsync(cancellationToken: cancellationToken);
+        }
+
+
+
+        private async Task DispatchToTopIntentAsync(WaterfallStepContext turnContext, string intent, RecognizerResult recognizerResult, CancellationToken cancellationToken)
+        {
+            switch (intent)
+            {
+                case "q_SaggezzaKB":
+                    await ProcessSampleQnAAsync(turnContext.Context, cancellationToken);
+                    break;
+                case "l_HomeAutomation":
+                    //await ProcessHomeAutomationAsync(turnContext, recognizerResult.Properties["luisResult"] as LuisResult, cancellationToken);
+                    break;
+                case "l_Weather":
+                    //await ProcessWeatherAsync(turnContext, recognizerResult.Properties["luisResult"] as LuisResult, cancellationToken);
+                    break;
+                case "q_sample-qna":
+                    await ProcessSampleQnAAsync(turnContext.Context, cancellationToken);
+                    break;
+                
+                default:
+                    //_logger.LogInformation($"Dispatch unrecognized intent: {intent}.");
+                    await turnContext.Context.SendActivityAsync(MessageFactory.Text($"Dispatch unrecognized intent: {intent}."), cancellationToken);
+                    break;
+            }
+        }
+
+        private async Task ProcessSampleQnAAsync(ITurnContext turnContext, CancellationToken cancellationToken)
+        {
+            _logger.LogInformation("ProcessSampleQnAAsync");
+
+            var results = await _botServices.SaggezzaQNAKB.GetAnswersAsync(turnContext);
+            if (results.Any())
+            {
+                await turnContext.SendActivityAsync(MessageFactory.Text(results.First().Answer), cancellationToken);
+            }
+            else
+            {
+                await turnContext.SendActivityAsync(MessageFactory.Text("Sorry, could not find an answer in the Q and A system."), cancellationToken);
+            }
+        }
+
+
+
+          private async Task<DialogTurnResult> ActStepAsync(WaterfallStepContext stepContext, CancellationToken cancellationToken)
         {
             // Call LUIS and gather any potential booking details. (Note the TurnContext has the response to the prompt.)
             var bookingDetails = stepContext.Result != null
                     ?
-                await LuisHelper.ExecuteLuisQuery(Configuration, Logger, stepContext.Context, cancellationToken)
+                await LuisHelper.ExecuteLuisQuery(Configuration, _logger, stepContext.Context, cancellationToken)
                     :
                 new BookingDetails();
 
@@ -82,7 +157,8 @@ namespace Microsoft.BotBuilderSamples.Dialogs
             return await stepContext.BeginDialogAsync(nameof(BookingDialog), bookingDetails, cancellationToken);
         }
 
-        private async Task<DialogTurnResult> FinalStepAsync(WaterfallStepContext stepContext, CancellationToken cancellationToken)
+      
+         private async Task<DialogTurnResult> FinalStepAsync1(WaterfallStepContext stepContext, CancellationToken cancellationToken)
         {
             // If the child dialog ("BookingDialog") was cancelled or the user failed to confirm, the Result here will be null.
             if (stepContext.Result != null)
@@ -106,25 +182,5 @@ namespace Microsoft.BotBuilderSamples.Dialogs
         }
 
 
-
-        private async Task DispatchToTopIntentAsync(WaterfallStepContext turnContext, string intent, RecognizerResult recognizerResult, CancellationToken cancellationToken)
-        {
-            switch (intent)
-            {
-                case "l_HomeAutomation":
-                    //await ProcessHomeAutomationAsync(turnContext, recognizerResult.Properties["luisResult"] as LuisResult, cancellationToken);
-                    break;
-                case "l_Weather":
-                    //await ProcessWeatherAsync(turnContext, recognizerResult.Properties["luisResult"] as LuisResult, cancellationToken);
-                    break;
-                case "q_sample-qna":
-                    //await ProcessSampleQnAAsync(turnContext, cancellationToken);
-                    break;
-                default:
-                    //_logger.LogInformation($"Dispatch unrecognized intent: {intent}.");
-                    await turnContext.Context.SendActivityAsync(MessageFactory.Text($"Dispatch unrecognized intent: {intent}."), cancellationToken);
-                    break;
-            }
-        }
     }
 }

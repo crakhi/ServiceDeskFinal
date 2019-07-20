@@ -12,6 +12,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.BotBuilderSamples.Bots;
 using Microsoft.BotBuilderSamples.Dialogs;
 using CoreBot.Services;
+using CoreBot.Bots;
+using System;
+using CoreBot.Dialogs;
 
 namespace Microsoft.BotBuilderSamples
 {
@@ -34,22 +37,26 @@ namespace Microsoft.BotBuilderSamples
             // Create the Bot Framework Adapter with error handling enabled.
             services.AddSingleton<IBotFrameworkHttpAdapter, AdapterWithErrorHandler>();
 
-            // Create the storage we'll be using for User and Conversation state. (Memory is great for testing purposes.)
-            services.AddSingleton<IStorage, MemoryStorage>();
+            //Configure State
+            ConfigureState(services);
 
-            // Create the User state. (Used in this bot's Dialog implementation.)
-            services.AddSingleton<UserState>();
-
-            // Create the Conversation state. (Used by the Dialog system itself.)
-            services.AddSingleton<ConversationState>();
+            //Configure Dialogs
+            ConfigureDialogs(services);
 
             services.AddSingleton<BotService>();
 
-            // The Dialog that will be run by the bot.
-            services.AddSingleton<MainDialog>();
+          
 
             // Create the bot as a transient. In this case the ASP Controller is expecting an IBot.
-            services.AddTransient<IBot, DialogAndWelcomeBot<MainDialog>>();
+            //services.AddTransient<IBot, DialogAndWelcomeBot<MainDialog>>();
+            services.AddTransient<IBot, SaggezzaBot<MainDialog>>();
+        }
+
+        private void ConfigureDialogs(IServiceCollection services)
+        {
+              // The Dialog that will be run by the bot.
+            services.AddSingleton<MainDialog>();
+            services.AddSingleton<GreetingDialog>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -68,6 +75,21 @@ namespace Microsoft.BotBuilderSamples
             app.UseStaticFiles();
 
             app.UseMvc();
+        }
+
+        private void ConfigureState(IServiceCollection services)
+        {
+            // Create the storage we'll be using for User and Conversation state. (Memory is great for testing purposes.)
+            services.AddSingleton<IStorage, MemoryStorage>();
+            
+            // Create the User state. (Used in this bot's Dialog implementation.)
+            services.AddSingleton<UserState>();
+
+            // Create the Conversation state. (Used by the Dialog system itself.)
+            services.AddSingleton<ConversationState>();
+
+            services.AddSingleton<BotStateService>();
+
         }
     }
 }

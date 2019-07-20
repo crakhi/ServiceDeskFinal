@@ -16,7 +16,9 @@ namespace CoreBot.Services
             {
                 var applicationId = configuration["LuisAppId"];
                 var endpointKey = configuration["LuisAPIKey"];
-                var endpoint = $"https://{configuration["LuisAPIHostName"]}.api.cognitive.microsoft.com";
+                var LuisAPIHostName = "westus";
+                var endpoint = $"https://{LuisAPIHostName}.api.cognitive.microsoft.com";
+                //var endpoint = "https://westus.api.cognitive.microsoft.com";
                 Dispatch = new LuisRecognizer(new LuisApplication(
                 applicationId,
                 endpointKey,
@@ -24,7 +26,7 @@ namespace CoreBot.Services
                 new LuisPredictionOptions { IncludeAllIntents = true, IncludeInstanceData = true },
                 true);
 
-            SampleQnA = new QnAMaker(new QnAMakerEndpoint
+            SaggezzaQNAKB = new QnAMaker(new QnAMakerEndpoint
             {
                 KnowledgeBaseId = configuration["QnAKnowledgebaseId"],
                 EndpointKey = configuration["QnAEndpointKey"],
@@ -41,6 +43,6 @@ namespace CoreBot.Services
         }
 
         public LuisRecognizer Dispatch { get; private set; }
-        public QnAMaker SampleQnA { get; private set; }
+        public QnAMaker SaggezzaQNAKB { get; private set; }
     }
 }
