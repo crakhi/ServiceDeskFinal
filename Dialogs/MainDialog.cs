@@ -61,6 +61,11 @@ namespace Microsoft.BotBuilderSamples.Dialogs
                 RecognizerResult recognizerResult = null;
                 recognizerResult = await _botServices.Dispatch.RecognizeAsync(stepContext.Context, cancellationToken);
 
+
+                //var result = stepContext.Context.Activity as Activity;
+                //string data = result.ChannelData.ToString();
+                //await stepContext.Context.SendActivityAsync(MessageFactory.Text(data), cancellationToken);
+
                 
                 string msg = JsonConvert.SerializeObject(recognizerResult.Intents);
                 await stepContext.Context.SendActivityAsync(MessageFactory.Text(msg), cancellationToken);
@@ -107,20 +112,21 @@ namespace Microsoft.BotBuilderSamples.Dialogs
                 case "q_SaggezzaKB":
                     await ProcessSampleQnAAsync(turnContext.Context, cancellationToken);
                     break;
-                case "l_HomeAutomation":
-                    //await ProcessHomeAutomationAsync(turnContext, recognizerResult.Properties["luisResult"] as LuisResult, cancellationToken);
-                    break;
-                case "l_Weather":
-                    //await ProcessWeatherAsync(turnContext, recognizerResult.Properties["luisResult"] as LuisResult, cancellationToken);
-                    break;
-                case "q_sample-qna":
-                    await ProcessSampleQnAAsync(turnContext.Context, cancellationToken);
-                    break;
+                //case "l_HomeAutomation":
+                //    //await ProcessHomeAutomationAsync(turnContext, recognizerResult.Properties["luisResult"] as LuisResult, cancellationToken);
+                //    break;
+                //case "l_Weather":
+                //    //await ProcessWeatherAsync(turnContext, recognizerResult.Properties["luisResult"] as LuisResult, cancellationToken);
+                //    break;
+                //case "q_sample-qna":
+                //    await ProcessSampleQnAAsync(turnContext.Context, cancellationToken);
+                //    break;
                 
                 default:
-                    //_logger.LogInformation($"Dispatch unrecognized intent: {intent}.");
-                    await turnContext.Context.SendActivityAsync(MessageFactory.Text($"Dispatch unrecognized intent: {intent}."), cancellationToken);
-                    break;
+                    //await InvokeTicketCreationDialog(turnContext.Context, cancellationToken);
+                    return await turnContext.BeginDialogAsync(nameof(TicketCreationDialog), bookingDetails, cancellationToken);
+                    //await turnContext.Context.SendActivityAsync(MessageFactory.Text($"Dispatch unrecognized intent: {intent}."), cancellationToken);
+                    //break;
             }
         }
 
